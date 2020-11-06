@@ -84,8 +84,8 @@ pub mod trollbox {
 
         #[derive(Serialize, Deserialize, Debug)]
         pub struct OutputChatMessage {
-			pub author: String,
-            pub text: String,
+			pub author: std::string::String,
+            pub text: std::string::String,
             pub timestamp: u64,
         }
 

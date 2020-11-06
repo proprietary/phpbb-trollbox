@@ -1,4 +1,6 @@
+#[macro_use] extern crate log;
 extern crate env_logger;
+
 use trollbox::trollbox::auth::Credentials;
 use trollbox::trollbox::msg::{InputChatMessage, OutputChatMessage};
 use ws::{Handler, Handshake, Message, Request, Response, Result, Sender};
@@ -51,7 +53,7 @@ struct Server {
 }
 
 impl Handler for Server {
-    fn on_open(&mut self, handshake: Handshake) -> Result<()> { 
+    fn on_open(&mut self, handshake: Handshake) -> Result<()> {
 		// Authenticate user
 		// get credential values from query string
 		let hdr = match handshake.request.resource().split('?').last() {
@@ -59,27 +61,43 @@ impl Handler for Server {
 				match query_string.split('=').last() {
 					Some(value) => value,
 					None => {
+						debug!("equals ('=') missing in query string");
 						return self.out.close(ws::CloseCode::Error);
 					}
 				}
 			}
 			None => {
+				debug!("query string missing");
 				return self.out.close(ws::CloseCode::Error);
 			}
 		};
+		debug!("received credentials string: {}", hdr);
 		let creds: Credentials = match base64::decode_config(hdr, base64::URL_SAFE_NO_PAD) {
-			Ok(creds_json) => serde_json::from_slice(&creds_json).unwrap(),
+			Ok(creds_json) => {
+				match serde_json::from_slice(&creds_json) {
+					Ok(creds) => creds,
+					Err(_) => {
+						debug!("couldn't deserialize credentials from JSON");
+						return self.out.close(ws::CloseCode::Error);
+					}
+				}
+			}
 			Err(_) => {
+				debug!("couldn't deserialize credentials from url-safe base64");
 				return self.out.close(ws::CloseCode::Error);
  			}
 		};
 		return if creds.check() {
 			self.credentials = Some(creds);
 			let h = Arc::clone(&self.past_messages);
-			let v = h.lock().unwrap();
-			let mut output: Vec<&OutputChatMessage> = vec![];
-			for m in v.iter().rev() {
-				output.push(m);
+			let hh = h.lock().unwrap();
+			let mut output: std::vec::Vec<OutputChatMessage> = vec![];
+			for m in hh.iter().rev() {
+				output.push(OutputChatMessage{
+					author: m.author.clone(),
+					text: m.text.clone(),
+					timestamp: m.timestamp,
+				});
 			}
 			let output_string = serde_json::to_string(&output).unwrap();
 			self.out.send(output_string)
@@ -89,7 +107,6 @@ impl Handler for Server {
     }
 
     fn on_message(&mut self, msg: Message) -> Result<()> {
-		println!("on_message...");
 		if let Some(_) = self.credentials {
 			let input_chat_message: InputChatMessage = serde_json::from_str(msg.as_text().unwrap()).unwrap();
 			let output_chat_message: OutputChatMessage = OutputChatMessage{
@@ -99,10 +116,11 @@ impl Handler for Server {
 			};
 			let output = serde_json::to_string(&output_chat_message).unwrap();
 			{
-				let mut v = self.past_messages.lock().unwrap();
-				v.push_front(output_chat_message);
-				if v.len() > PAST_MESSAGES_MAX_SIZE {
-					v.truncate(PAST_MESSAGES_MAX_SIZE)
+				let v = Arc::clone(&self.past_messages);
+				let mut vv = v.lock().unwrap();
+				vv.push_front(output_chat_message);
+				if vv.len() > PAST_MESSAGES_MAX_SIZE {
+					vv.truncate(PAST_MESSAGES_MAX_SIZE);
 				}
 			}
 			self.out.broadcast(output)
@@ -113,6 +131,9 @@ impl Handler for Server {
 
     fn on_request(&mut self, req: &Request) -> Result<Response> {
 		let path_components: std::vec::Vec<&str> = req.resource().split('?').collect();
+		if path_components.len() == 0 {
+			return Ok(Response::new(404, "Not Found", b"404 - Not Found".to_vec()));
+		}
         match path_components[0] {
             "/ws" => Response::from_request(req),
 			"/test-make-auth-token" => {
@@ -132,18 +153,15 @@ impl Handler for Server {
     }
 
 	fn upgrade_ssl_server(&mut self, sock: TcpStream) -> ws::Result<SslStream<TcpStream>> {
-		println!("upgrading...");
 		let a = self.tls_acceptor.as_ref().accept(sock);
 		match a {
-			Ok(stream) => {
-				println!("TLS stream created successfully");
-				Ok(stream)
+			Ok(x) => {
+				return Ok(x);
 			}
-			Err(_) => {
-				println!("error failed");
-				println!("{:#?}", a);
-				Err(ws::Error::new(ws::ErrorKind::Internal, ""))
-			}
+			Err(ref x) => {
+				debug!("upgrade ssl server error: {:#?}", x);
+				a.map_err(From::from)
+			},
 		}
 	}
 }
@@ -178,11 +196,13 @@ fn main() {
 	let past_messages: Arc<Mutex<VecDeque<OutputChatMessage>>> = Arc::new(Mutex::new(VecDeque::with_capacity(PAST_MESSAGES_MAX_SIZE)));
 	ws::Builder::new().with_settings(ws::Settings {
 		encrypt_server: true,
+		panic_on_internal: false,
+		max_connections: 65536,
 		..ws::Settings::default()
 	}).build(|out: ws::Sender| Server {
 		out: out,
 		tls_acceptor: tls_acceptor.clone(),
 		credentials: None,
-		past_messages: past_messages.clone(),
+		past_messages: Arc::clone(&past_messages),
 	}).unwrap().listen("0.0.0.0:50888").unwrap();
 }
