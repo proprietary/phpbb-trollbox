@@ -179,6 +179,7 @@ class Trollbox extends HTMLElement {
 		shadow.appendChild(trollboxTemplate.content.cloneNode(true));
 		this.socket = null;
 		this.reconnectTimeout = 1000;
+		this.messages = [];
 	}
 
 	get serverEndpoint() {
@@ -204,6 +205,8 @@ class Trollbox extends HTMLElement {
 
 
 	async _authenticate() {
+		this.authToken = `eyJ0aW1lc3RhbXAiOjE2MDQ3MDE0NTMsInVzZXJuYW1lIjoiQW5vbnltb3VzIiwic2lnbmF0dXJlIjoiMmEzYTc1NjVmYTE1OTFiOWY5MWJkZjcyYTdkNzdhYjZlZjdjZTU0YWNjMDljZWE5ODUyNDg0Y2IwNTJiNjNmYiJ9`;
+		return;
 		try {
 			const authToken = await fetch(this.authEndpoint).then(resp => resp.text());
 			if (authToken.length === 0) {
@@ -234,6 +237,8 @@ class Trollbox extends HTMLElement {
 		});
 		this.socket.addEventListener('error', (err) => {
 			console.error(`chat error: ${err.message}; reconnecting...`);
+			console.error(err);
+			this.socket.close();
 		});
 	}
 
@@ -246,9 +251,24 @@ class Trollbox extends HTMLElement {
 	_acceptRemoteMessage = (evt) => {
 		const msg = JSON.parse(evt.data);
 		if (Object.prototype.toString.call(msg) === '[object Array]') {
-			msg.forEach(this._addMessage);
+			if (this.messages.length === 0) {
+				msg.forEach(this._addMessage);
+				this.messages = msg;
+			} else if (typeof this.messages !== 'undefined') {
+				// find messages we missed while disconnected, if any
+				const lastSavedMessage = this.messages[this.messages.length - 1];
+				const firstUnseenMessageIdx = msg.findIndex((newMessage) => {
+					return newMessage.timestamp === lastSavedMessage.timestamp && newMessage.text === lastSavedMessage.text;
+				}) + 1;
+				// insert only unseen messages
+				for (let i = firstUnseenMessageIdx; i < msg.length; ++i) {
+					this.messages.push(msg[i]);
+					this._addMessage(msg[i]);
+				}
+			}
 		} else {
 			this._addMessage(msg);
+			this.messages.push(msg);
 		}
 	}
 
