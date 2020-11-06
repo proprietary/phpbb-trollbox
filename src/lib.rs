@@ -1,3 +1,5 @@
+#[macro_use] extern crate log;
+
 pub mod trollbox {
     pub mod auth {
         use serde::{Deserialize, Serialize};
@@ -26,7 +28,8 @@ pub mod trollbox {
                 }
                 // Check signature
                 let computed_signature = self.make_signature();
-                return self.signature.eq(&computed_signature);
+				debug!("computed_signature = {}, signature = {}", computed_signature, self.signature);
+                return self.signature == computed_signature;
             }
 
             pub fn make_signature(&self) -> String {
@@ -42,7 +45,7 @@ pub mod trollbox {
                 let mut result_string = String::new();
                 // Convert output digest to lowercase hex string
                 for b in result {
-                    write!(&mut result_string, "{:x}", b).unwrap();
+                    write!(&mut result_string, "{:02x}", b).unwrap();
                 }
                 return String::from(result_string);
             }

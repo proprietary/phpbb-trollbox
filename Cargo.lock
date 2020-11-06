@@ -625,6 +625,7 @@ dependencies = [
  "env_logger",
  "lockfree",
  "log",
+ "mio-extras",
  "openssl",
  "serde",
  "serde_json",

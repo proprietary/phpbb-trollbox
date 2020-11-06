@@ -3,15 +3,16 @@ extern crate env_logger;
 
 use trollbox::trollbox::auth::Credentials;
 use trollbox::trollbox::msg::{InputChatMessage, OutputChatMessage};
-use ws::{Handler, Handshake, Message, Request, Response, Result, Sender};
-use ws::util::TcpStream;
+use ws::{Handler, Handshake, Message, Request, Response, Result, Sender, OpCode, Frame};
+use mio_extras::timer::Timeout;
+use ws::util::Token;
 use std::sync::{Arc, Mutex};
 use std::collections::VecDeque;
-use openssl::ssl::{SslAcceptor, SslMethod, SslStream};
-use openssl::x509::X509;
-use openssl::pkey::PKey;
 
 const PAST_MESSAGES_MAX_SIZE: usize = 100;
+
+const PING: Token = Token(1);
+const EXPIRE: Token = Token(2);
 
 // static HTML: &'static [u8] = br#"
 // 	<!doctype html>
@@ -47,9 +48,10 @@ const PAST_MESSAGES_MAX_SIZE: usize = 100;
 
 struct Server {
     out: Sender,
-	tls_acceptor: std::rc::Rc<SslAcceptor>,
 	credentials: Option<Credentials>,
 	past_messages: Arc<Mutex<VecDeque<OutputChatMessage>>>,
+	ping_timeout: Option<Timeout>,
+	expire_timeout: Option<Timeout>,
 }
 
 impl Handler for Server {
@@ -87,10 +89,16 @@ impl Handler for Server {
 				return self.out.close(ws::CloseCode::Error);
  			}
 		};
+		debug!("checking credentials...");
 		return if creds.check() {
+			// schedule ping/pong timeouts
+			self.out.timeout(5_000, PING).unwrap();
+			self.out.timeout(30_000, EXPIRE).unwrap();
+			// save credentials
 			self.credentials = Some(creds);
-			let h = Arc::clone(&self.past_messages);
+			let h = self.past_messages.clone();
 			let hh = h.lock().unwrap();
+			debug!("successful unlock of shared past_messages");
 			let mut output: std::vec::Vec<OutputChatMessage> = vec![];
 			for m in hh.iter().rev() {
 				output.push(OutputChatMessage{
@@ -102,6 +110,7 @@ impl Handler for Server {
 			let output_string = serde_json::to_string(&output).unwrap();
 			self.out.send(output_string)
 		} else {
+			debug!("invalid credentials");
 			self.out.close(ws::CloseCode::Error)
 		}
     }
@@ -129,6 +138,77 @@ impl Handler for Server {
 		}
     }
 
+	fn on_error(&mut self, err: ws::Error) {
+		warn!("ws server error: {}", err);
+	}
+
+	fn on_timeout(&mut self, event: Token) -> Result<()> {
+		match event {
+			PING => {
+				let t: String = std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH)
+					.expect("System clock before 1970, wtf?")
+					.as_nanos()
+					.to_string();
+				self.out.ping(t.into())?;
+				self.ping_timeout.take();
+				self.out.timeout(5_000, PING)
+			},
+			EXPIRE => self.out.close(ws::CloseCode::Away),
+			_ => Err(ws::Error::new(ws::ErrorKind::Internal, "Unknown timeout token")),
+		}
+	}
+
+	fn on_new_timeout(&mut self, event: Token, timeout: Timeout) -> Result<()> {
+		// Cancel the old timeout and replace with a new one.
+		match event {
+			EXPIRE => {
+				if let Some(t) = self.expire_timeout.take() {
+					self.out.cancel(t)?
+				}
+				self.expire_timeout = Some(timeout)
+			}
+			_ => {
+				if let Some(t) = self.ping_timeout.take() {
+					self.out.cancel(t)?
+				}
+				self.ping_timeout = Some(timeout)
+			}
+		}
+		Ok(())
+	}
+
+	fn on_frame(&mut self, frame: Frame) -> Result<Option<Frame>> {
+		use std::convert::TryInto;
+        // If the frame is a pong, print the round-trip time.
+        // The pong should contain data from out ping, but it isn't guaranteed to.
+        if frame.opcode() == OpCode::Pong {
+            if let Ok(pong) = std::str::from_utf8(frame.payload())?.parse::<u64>() {
+				let now: u64 = std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH).expect("Syste clock was before 1970, wtf?").as_nanos().try_into().expect("This function will be removed long before this becomes a problem");
+                debug!("RTT is {:.3}ms.", (now - pong) as f64 / 1_000_000f64);
+            } else {
+                warn!("Received bad pong.");
+            }
+        }
+
+        // Some activity has occured, so reset the expiration
+        self.out.timeout(30_000, EXPIRE)?;
+
+        // Run default frame validation
+        DefaultHandler.on_frame(frame)
+    }
+
+	fn on_close(&mut self, code: ws::CloseCode, reason: &str) {
+		debug!("WebSocket closing for ({:?}) {}", code, reason);
+		// clean up timeouts
+		if let Some(t) = self.ping_timeout.take() {
+			self.out.cancel(t).unwrap();
+		}
+		if let Some(t) = self.expire_timeout.take() {
+			self.out.cancel(t).unwrap();
+		}
+	}
+
+
     fn on_request(&mut self, req: &Request) -> Result<Response> {
 		let path_components: std::vec::Vec<&str> = req.resource().split('?').collect();
 		if path_components.len() == 0 {
@@ -151,58 +231,24 @@ impl Handler for Server {
             _ => Ok(Response::new(404, "Not Found", b"404 - Not Found".to_vec())),
         }
     }
-
-	fn upgrade_ssl_server(&mut self, sock: TcpStream) -> ws::Result<SslStream<TcpStream>> {
-		let a = self.tls_acceptor.as_ref().accept(sock);
-		match a {
-			Ok(x) => {
-				return Ok(x);
-			}
-			Err(ref x) => {
-				debug!("upgrade ssl server error: {:#?}", x);
-				a.map_err(From::from)
-			},
-		}
-	}
 }
 
-fn read_file(path: &str) -> std::io::Result<std::vec::Vec<u8>> {
-	use std::io::Read;
-	let mut file = std::fs::File::open(path)?;
-	let mut buf = std::vec::Vec::new();
-	file.read_to_end(&mut buf)?;
-	Ok(buf)
-}
+struct DefaultHandler;
+
+impl Handler for DefaultHandler {}
 
 fn main() {
 	env_logger::init();
-	// set up TLS
-	let tls_cert_path = std::env::var("TROLLBOX_TLS_CERT_PATH").expect("Process must have TROLLBOX_TLS_CERT_PATH in its environment");
-	let tls_privkey_path = std::env::var("TROLLBOX_TLS_PRIVKEY_PATH").expect("Process must have TROLLBOX_TLS_PRIVKEY_PATH in its environment");
-	let tls_cert = {
-		let data = read_file(&tls_cert_path).unwrap();
-		X509::from_pem(data.as_ref()).unwrap()
-	};
-	let tls_privkey = {
-		let data = read_file(&tls_privkey_path).unwrap();
-		PKey::private_key_from_pem(data.as_ref()).unwrap()
-	};
-	let tls_acceptor = std::rc::Rc::new({
-		let mut builder = SslAcceptor::mozilla_intermediate_v5(SslMethod::tls()).unwrap();
-		builder.set_private_key(&tls_privkey).unwrap();
-		builder.set_certificate(&tls_cert).unwrap();
-		builder.build()
-	});
 	let past_messages: Arc<Mutex<VecDeque<OutputChatMessage>>> = Arc::new(Mutex::new(VecDeque::with_capacity(PAST_MESSAGES_MAX_SIZE)));
 	ws::Builder::new().with_settings(ws::Settings {
-		encrypt_server: true,
 		panic_on_internal: false,
 		max_connections: 65536,
 		..ws::Settings::default()
 	}).build(|out: ws::Sender| Server {
 		out: out,
-		tls_acceptor: tls_acceptor.clone(),
 		credentials: None,
-		past_messages: Arc::clone(&past_messages),
+		past_messages: past_messages.clone(),
+		ping_timeout: None,
+		expire_timeout: None,
 	}).unwrap().listen("0.0.0.0:50888").unwrap();
 }
