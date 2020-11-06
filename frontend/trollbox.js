@@ -138,36 +138,6 @@ customElements.define('tb-input', TrollboxInput);
 const trollboxTemplate = document.createElement('template');
 trollboxTemplate.innerHTML = `
 <style>
-@media only screen and (max-width: 600px) {
-  :host {
-    max-width: 80vw;
-  }
-}
-
-@media only screen and (min-width: 600px) {
-  :host {
-    max-width: 60vw;
-  }
-}
-
-@media only screen and (min-width: 768px) {
-  :host {
-    max-width: 50vw;
-  }
-}
-
-@media only screen and (min-width: 992px) {
-  :host {
-    max-width: 30vw;
-  }
-}
-
-@media only screen and (min-width: 1200px) {
-  :host {
-    max-width: 20vw;
-  }
-}
-
 :host {
   display: block;
   padding: 0;
@@ -188,6 +158,7 @@ trollboxTemplate.innerHTML = `
 [data-id="messages"] {
   overflow-y: scroll;
   min-height: 30vh;
+  max-height: 50vh;
 }
 
 header {
@@ -229,8 +200,6 @@ class Trollbox extends HTMLElement {
 
 	connectedCallback() {
 		this.shadowRoot.addEventListener('TrollboxSubmitMessage', this._handleSubmitMessage);
-		this.shadowRoot.querySelector('header').addEventListener('click', this._toggleVisibility);
-		this._toggleVisibility(this.shadowRoot.querySelector('header'));
 		this._authenticate().then(() => {
 			this._openConnection();
 		});
@@ -307,19 +276,6 @@ class Trollbox extends HTMLElement {
 			timestamp: Math.floor(new Date().getTime() / 1000),
 		};
 		this._sendChatMessage(inputMessage);
-	}
-
-	_toggleVisibility = (evt) => {
-		const body = this.shadowRoot.querySelector('main');
-		if (body.style.visibility === '' || body.style.visibility === 'visible') {
-			body.style.visibility = 'hidden';
-			body.style.minHeight = '0px';
-			body.style.height = '0px';
-		} else if (body.style.visibility === 'hidden') {
-			body.style.visibility = 'visible';
-			body.style.minHeight = '30vh';
-			body.style.height = '';
-		}
 	}
 }
 
