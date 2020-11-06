@@ -182,6 +182,7 @@ class Trollbox extends HTMLElement {
 		const shadow = this.attachShadow({mode: 'open'});
 		shadow.appendChild(trollboxTemplate.content.cloneNode(true));
 		this.socket = null;
+		this.reconnectTimeout = 1000;
 	}
 
 	get serverEndpoint() {
@@ -232,13 +233,11 @@ class Trollbox extends HTMLElement {
 		this.socket.addEventListener('message', this._acceptRemoteMessage);
 		this.socket.addEventListener('close', () => {
 			console.info(`chat disconnected. reconnecting...`);
-			setTimeout(this._openConnection.bind(this), 5000);
-			this.socket.close();
+			setTimeout(this._openConnection.bind(this), this.reconnectTimeout);
+			this.reconnectTimeout *= 2;
 		});
 		this.socket.addEventListener('error', (err) => {
-			console.error(`chat error: ${err}; reconnecting...`);
-			setTimeout(this._openConnection.bind(this), 5000);
-			this.socket.close();
+			console.error(`chat error: ${err.message}; reconnecting...`);
 		});
 	}
 
