@@ -4,7 +4,7 @@ const trollboxMessageRowTemplate = document.createElement('template');
 trollboxMessageRowTemplate.innerHTML = `
 <style>
 time {
-  color: gray;
+  color: darkgray;
 }
 
 .message {
@@ -144,9 +144,9 @@ trollboxTemplate.innerHTML = `
 }
 
 .container {
-  background-color: maroon;
+  background-color: #f5f7fa;
   border-radius: 1rem;
-  color: white;
+  color: black;
   padding: 0.1rem 0.5rem 0.5rem 0.5rem;
 }
 
