@@ -91,9 +91,9 @@ impl Handler for Server {
 		};
 		debug!("checking credentials...");
 		return if creds.check() {
-			// schedule ping/pong timeouts
-			self.out.timeout(5_000, PING).unwrap();
-			self.out.timeout(30_000, EXPIRE).unwrap();
+			// schedule pings
+			self.out.timeout(10_000, PING).unwrap();
+			self.out.timeout(60_000, EXPIRE).unwrap();
 			// save credentials
 			self.credentials = Some(creds);
 			let h = self.past_messages.clone();
@@ -151,9 +151,16 @@ impl Handler for Server {
 					.to_string();
 				self.out.ping(t.into())?;
 				self.ping_timeout.take();
-				self.out.timeout(5_000, PING)
+				self.out.timeout(10_000, PING)
 			},
-			EXPIRE => self.out.close(ws::CloseCode::Away),
+			EXPIRE => {
+				debug!("EXPIRED timeout met. Client did not pong back in time.");
+				if let Some(t) = self.expire_timeout.take() {
+					debug!("on_timeout(): expired timeout is {:#?}", t);
+				}
+				self.out.timeout(60_000, EXPIRE)
+				// TODO: drop connection here?
+			},
 			_ => Err(ws::Error::new(ws::ErrorKind::Internal, "Unknown timeout token")),
 		}
 	}
@@ -162,17 +169,21 @@ impl Handler for Server {
 		// Cancel the old timeout and replace with a new one.
 		match event {
 			EXPIRE => {
+				debug!("changing expire timeout...");
 				if let Some(t) = self.expire_timeout.take() {
 					self.out.cancel(t)?
 				}
 				self.expire_timeout = Some(timeout)
 			}
-			_ => {
+			PING => {
+				debug!("changing ping timeout...");
+				// ensures there is only one ping timeout at any time
 				if let Some(t) = self.ping_timeout.take() {
 					self.out.cancel(t)?
 				}
 				self.ping_timeout = Some(timeout)
 			}
+			_ => (),
 		}
 		Ok(())
 	}
@@ -191,13 +202,17 @@ impl Handler for Server {
         }
 
         // Some activity has occured, so reset the expiration
-        self.out.timeout(30_000, EXPIRE)?;
+		if let Some(t) = self.expire_timeout.take() {
+			debug!("expire timeout: {:#?}", t);
+			self.out.cancel(t).unwrap();
+		}
+        self.out.timeout(60_000, EXPIRE)?;
 
         // Run default frame validation
         DefaultHandler.on_frame(frame)
     }
 
-	fn on_close(&mut self, code: ws::CloseCode, reason: &str) {
+ 	fn on_close(&mut self, code: ws::CloseCode, reason: &str) {
 		debug!("WebSocket closing for ({:?}) {}", code, reason);
 		// clean up timeouts
 		if let Some(t) = self.ping_timeout.take() {
