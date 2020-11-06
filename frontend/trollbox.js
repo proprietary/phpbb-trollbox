@@ -72,10 +72,6 @@ trollboxInputTemplate.innerHTML = `
     flex-basis: 100%;
   }
 
-  button {
-    font-size: 1.5rem;
-  }
-
   form {
     display: flex;
     flex-flow: row nowrap;
@@ -85,7 +81,6 @@ trollboxInputTemplate.innerHTML = `
 </style>
 <form validate>
   <textarea required placeholder="Write your message here"></textarea>
-  <button type="submit">Send</button>
 </form>`;
 
 class TrollboxInput extends HTMLElement {
