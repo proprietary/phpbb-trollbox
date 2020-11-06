@@ -109,14 +109,12 @@ class TrollboxInput extends HTMLElement {
 		evt.preventDefault();
 		evt.stopPropagation();
 		const messageInputField = this.shadowRoot.querySelector('textarea');
-		if (messageInputField.reportValidity() === true) {
+		if (messageInputField.reportValidity() === true && messageInputField.value.length > 0) {
 			const message = messageInputField.value + '';
 			this.dispatchEvent(
 				new CustomEvent('TrollboxSubmitMessage', { bubbles: true, composed: true, detail: { message: message } })
 			);
 			messageInputField.value = '';
-			console.info("submitting...");
-			console.log(evt);
 		}
 	}
 
