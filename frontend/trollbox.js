@@ -6,6 +6,10 @@ trollboxMessageRowTemplate.innerHTML = `
 time {
   color: gray;
 }
+
+.message {
+  white-space: pre-wrap;
+}
 </style>
 <p>
   <strong class="author"></strong>: <span class="message"></span> <time></time>
@@ -90,18 +94,19 @@ class TrollboxInput extends HTMLElement {
 	connectedCallback() {
 		this.shadowRoot.querySelector('form').addEventListener('submit', this._handleSubmit);
 		this.shadowRoot.querySelector('textarea').addEventListener('keydown', this._handleKeyPress);
+		this.shadowRoot.querySelector('button').addEventListener('click', this._handleSubmit);
 	}
 
 	disconnectedCallback() {
 		this.shadowRoot.querySelector('form').removeEventListener('submit', this._handleSubmit);
+		this.shadowRoot.querySelector('textarea').removeEventListener('keydown', this._handleKeyPress);
+		this.shadowRoot.querySelector('button').removeEventListener('click', this._handleSubmit);
 	}
 
-	_handleSubmit(evt) {
+	_handleSubmit = (evt) => {
 		evt.preventDefault();
-		evt.target.checkValidity();
-		const messageInputField = evt.target.querySelector('textarea');
+		const messageInputField = this.shadowRoot.querySelector('textarea');
 		const message = messageInputField.value + '';
-		console.info(`submitting: ${evt.target.querySelector('textarea').value}`);
 		messageInputField.value = '';
 		this.dispatchEvent(
 			new CustomEvent('TrollboxSubmitMessage', { bubbles: true, composed: true, detail: { message: message } })
@@ -128,8 +133,40 @@ customElements.define('tb-input', TrollboxInput);
 const trollboxTemplate = document.createElement('template');
 trollboxTemplate.innerHTML = `
 <style>
+@media only screen and (max-width: 600px) {
+  :host {
+    max-width: 80vw;
+  }
+}
+
+@media only screen and (min-width: 600px) {
+  :host {
+    max-width: 60vw;
+  }
+}
+
+@media only screen and (min-width: 768px) {
+  :host {
+    max-width: 50vw;
+  }
+}
+
+@media only screen and (min-width: 992px) {
+  :host {
+    max-width: 30vw;
+  }
+}
+
+@media only screen and (min-width: 1200px) {
+  :host {
+    max-width: 20vw;
+  }
+}
+
 :host {
   display: block;
+  padding: 0;
+  margin: 0;
 }
 
 * {
@@ -140,25 +177,25 @@ trollboxTemplate.innerHTML = `
   background-color: maroon;
   border-radius: 1rem;
   color: white;
-  padding: 0.5rem 1rem 1rem 1rem;
+  padding: 0.1rem 0.5rem 0.5rem 0.5rem;
 }
 
 [data-id="messages"] {
   overflow-y: scroll;
-  height: 300px;
+  min-height: 30vh;
 }
 
 header {
   cursor: pointer;
 }
 
-main tb-input {
-  padding-top: 1rem;
+tb-input {
+  margin-top: 1rem;
 }
 </style>
 <div class="container">
   <header>
-    <h2>Trollbox</h2>
+    <h2>DW Chat</h2>
   </header>
   <main>
     <div data-id="messages">
@@ -173,22 +210,86 @@ class Trollbox extends HTMLElement {
 		super();
 		const shadow = this.attachShadow({mode: 'open'});
 		shadow.appendChild(trollboxTemplate.content.cloneNode(true));
+		this.socket = null;
 	}
+
+	get serverEndpoint() {
+		return this.getAttribute('serverEndpoint');
+	}
+
+	get authEndpoint() {
+		return this.getAttribute('authEndpoint');
+	}
+
 
 	connectedCallback() {
 		this.shadowRoot.addEventListener('TrollboxSubmitMessage', this._handleSubmitMessage);
 		this.shadowRoot.querySelector('header').addEventListener('click', this._toggleVisibility);
+		this._toggleVisibility(this.shadowRoot.querySelector('header'));
+		this._authenticate().then(() => {
+			this._openConnection();
+		});
 	}
 
 	disconnectedCallback() {
 		this.shadowRoot.addEventListener('TrollboxSubmitMessage', this._handleSubmitMessage);
+		this._closeConnection();
 	}
 
-	_addMessage(msg) {
+
+	async _authenticate() {
+		// try {
+		// 	const authToken = await fetch(this.authEndpoint).then(resp => resp.text());
+		// 	if (authToken.length === 0) {
+		// 		throw new Error(`Received no auth token`);
+		// 	}
+		// 	const a = authToken.split('.');
+		// 	if (a.length >= 3) {
+		// 		this.authToken = { username: a[2], timestamp: parseInt(a[1]), signature: a[0] };
+		// 		// perform url-safe base64 encoding
+		// 		this.authToken = btoa(JSON.stringify(this.authToken));
+		// 		this.authToken = this.authToken.replace(/\//g, '_').replace(/\+/g, '-').replace(/=/g, '');
+		// 	}
+		// } catch (e) {
+		// 	console.error(e);
+		// }
+		this.authToken = `eyJ0aW1lc3RhbXAiOjE2MDQ2MzMyMjIsInVzZXJuYW1lIjoiQW5vbnltb3VzIiwic2lnbmF0dXJlIjoiNTQxNzZjYzBhNTU4NDk4ZmJhNzg1YTNhMGMxZGZkMTRhNGM5MjkxNDQ4NTFlMWJlYTMzMzQ0MjM3MWMxIn0`;
+	}
+
+	_openConnection() {
+		if (this.authToken == null) {
+			throw new Error(`Authenticate before opening connection to server`);
+		}
+		this.socket = new WebSocket(`${this.serverEndpoint}?auth=${this.authToken}`);
+		this.socket.addEventListener('message', this._acceptRemoteMessage);
+	}
+
+	_closeConnection() {
+		if (this.socket != null) {
+			this.socket.removeEventListener('message', this._acceptRemoteMessage);
+		}
+	}
+
+	_acceptRemoteMessage = (evt) => {
+		const msg = JSON.parse(evt.data);
+		if (Object.prototype.toString.call(msg) === '[object Array]') {
+			msg.forEach(this._addMessage);
+		} else {
+			this._addMessage(msg);
+		}
+	}
+
+	async _sendChatMessage(msg) {
+		if (this.socket != null) {
+			this.socket.send(JSON.stringify(msg));
+		}
+	}
+
+	_addMessage = (msg) => {
 		const newMessageElement = document.createElement('tb-message-row');
 		newMessageElement.setAttribute('author', msg.author);
-		newMessageElement.setAttribute('message', msg.message);
-		newMessageElement.setAttribute('timestamp', msg.timestamp);
+		newMessageElement.setAttribute('message', msg.text);
+		newMessageElement.setAttribute('timestamp', new Date(parseInt(msg.timestamp) * 1000).toISOString());
 		const messagesContainer = this.shadowRoot.querySelector('[data-id="messages"]');
 		messagesContainer.appendChild(newMessageElement);
 		// scroll down to the latest message
@@ -197,22 +298,23 @@ class Trollbox extends HTMLElement {
 
 	_handleSubmitMessage = (evt) => {
 		evt.stopPropagation();
-		console.info(`received message in parent: ${evt.detail.message}`);
-		this._addMessage({
-			author: 'me (TODO)',
-			message: evt.detail.message,
-			timestamp: new Date().toISOString(),
-		});
+		const inputMessage = {
+			text: evt.detail.message,
+			timestamp: Math.floor(new Date().getTime() / 1000),
+		};
+		this._sendChatMessage(inputMessage);
 	}
 
 	_toggleVisibility = (evt) => {
 		const body = this.shadowRoot.querySelector('main');
 		if (body.style.visibility === '' || body.style.visibility === 'visible') {
 			body.style.visibility = 'hidden';
-			body.style.maxHeight = '10px';
+			body.style.minHeight = '0px';
+			body.style.height = '0px';
 		} else if (body.style.visibility === 'hidden') {
 			body.style.visibility = 'visible';
-			body.style.maxHeight = '';
+			body.style.minHeight = '30vh';
+			body.style.height = '';
 		}
 	}
 }
