@@ -156,10 +156,6 @@ trollboxTemplate.innerHTML = `
   max-height: 50vh;
 }
 
-header {
-  cursor: pointer;
-}
-
 tb-input {
   margin-top: 1rem;
 }
