@@ -10,6 +10,10 @@ time {
 .message {
   white-space: pre-wrap;
 }
+
+:host {
+  font-size: 1.1em;
+}
 </style>
 <p>
   <strong class="author"></strong>: <span class="message"></span> <time></time>
@@ -94,23 +98,26 @@ class TrollboxInput extends HTMLElement {
 	connectedCallback() {
 		this.shadowRoot.querySelector('form').addEventListener('submit', this._handleSubmit);
 		this.shadowRoot.querySelector('textarea').addEventListener('keydown', this._handleKeyPress);
-		this.shadowRoot.querySelector('button').addEventListener('click', this._handleSubmit);
 	}
 
 	disconnectedCallback() {
 		this.shadowRoot.querySelector('form').removeEventListener('submit', this._handleSubmit);
 		this.shadowRoot.querySelector('textarea').removeEventListener('keydown', this._handleKeyPress);
-		this.shadowRoot.querySelector('button').removeEventListener('click', this._handleSubmit);
 	}
 
 	_handleSubmit = (evt) => {
 		evt.preventDefault();
+		evt.stopPropagation();
 		const messageInputField = this.shadowRoot.querySelector('textarea');
-		const message = messageInputField.value + '';
-		messageInputField.value = '';
-		this.dispatchEvent(
-			new CustomEvent('TrollboxSubmitMessage', { bubbles: true, composed: true, detail: { message: message } })
-		);
+		if (messageInputField.reportValidity() === true) {
+			const message = messageInputField.value + '';
+			this.dispatchEvent(
+				new CustomEvent('TrollboxSubmitMessage', { bubbles: true, composed: true, detail: { message: message } })
+			);
+			messageInputField.value = '';
+			console.info("submitting...");
+			console.log(evt);
+		}
 	}
 
 	_handleKeyPress = (evt) => {
@@ -122,7 +129,7 @@ class TrollboxInput extends HTMLElement {
 			// Do not submit on empty input
 			if (evt.target.reportValidity() === true) {
 				// Submit form
-				evt.target.form.dispatchEvent(new Event('submit', { cancelable: true }));
+				evt.target.form.dispatchEvent(new SubmitEvent('submit', { submitter: evt.target }));
 			}
 		}
 	}
