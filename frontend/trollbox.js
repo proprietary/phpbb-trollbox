@@ -245,22 +245,21 @@ class Trollbox extends HTMLElement {
 
 
 	async _authenticate() {
-		// try {
-		// 	const authToken = await fetch(this.authEndpoint).then(resp => resp.text());
-		// 	if (authToken.length === 0) {
-		// 		throw new Error(`Received no auth token`);
-		// 	}
-		// 	const a = authToken.split('.');
-		// 	if (a.length >= 3) {
-		// 		this.authToken = { username: a[2], timestamp: parseInt(a[1]), signature: a[0] };
-		// 		// perform url-safe base64 encoding
-		// 		this.authToken = btoa(JSON.stringify(this.authToken));
-		// 		this.authToken = this.authToken.replace(/\//g, '_').replace(/\+/g, '-').replace(/=/g, '');
-		// 	}
-		// } catch (e) {
-		// 	console.error(e);
-		// }
-		this.authToken = `eyJ0aW1lc3RhbXAiOjE2MDQ2MzMyMjIsInVzZXJuYW1lIjoiQW5vbnltb3VzIiwic2lnbmF0dXJlIjoiNTQxNzZjYzBhNTU4NDk4ZmJhNzg1YTNhMGMxZGZkMTRhNGM5MjkxNDQ4NTFlMWJlYTMzMzQ0MjM3MWMxIn0`;
+		try {
+			const authToken = await fetch(this.authEndpoint).then(resp => resp.text());
+			if (authToken.length === 0) {
+				throw new Error(`Received no auth token`);
+			}
+			const a = authToken.split('.');
+			if (a.length >= 3) {
+				this.authToken = { username: a[2], timestamp: parseInt(a[1]), signature: a[0] };
+				// perform url-safe base64 encoding
+				this.authToken = btoa(JSON.stringify(this.authToken));
+				this.authToken = this.authToken.replace(/\//g, '_').replace(/\+/g, '-').replace(/=/g, '');
+			}
+		} catch (e) {
+			console.error(e);
+		}
 	}
 
 	_openConnection() {
