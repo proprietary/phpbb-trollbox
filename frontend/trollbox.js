@@ -230,6 +230,16 @@ class Trollbox extends HTMLElement {
 		}
 		this.socket = new WebSocket(`${this.serverEndpoint}?auth=${this.authToken}`);
 		this.socket.addEventListener('message', this._acceptRemoteMessage);
+		this.socket.addEventListener('close', () => {
+			console.info(`chat disconnected. reconnecting...`);
+			setTimeout(this._openConnection.bind(this), 5000);
+			this.socket.close();
+		});
+		this.socket.addEventListener('error', (err) => {
+			console.error(`chat error: ${err}; reconnecting...`);
+			setTimeout(this._openConnection.bind(this), 5000);
+			this.socket.close();
+		});
 	}
 
 	_closeConnection() {
