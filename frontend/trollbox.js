@@ -79,7 +79,7 @@ trollboxInputTemplate.innerHTML = `
     width: 100%;
   }
 </style>
-<form validate>
+<form>
   <textarea required placeholder="Write your message here"></textarea>
 </form>`;
 
@@ -102,7 +102,6 @@ class TrollboxInput extends HTMLElement {
 
 	_handleSubmit = (evt) => {
 		evt.preventDefault();
-		evt.stopPropagation();
 		const messageInputField = this.shadowRoot.querySelector('textarea');
 		if (messageInputField.reportValidity() === true && messageInputField.value.length > 0) {
 			const message = messageInputField.value + '';
@@ -122,7 +121,7 @@ class TrollboxInput extends HTMLElement {
 			// Do not submit on empty input
 			if (evt.target.reportValidity() === true) {
 				// Submit form
-				evt.target.form.dispatchEvent(new SubmitEvent('submit', { submitter: evt.target }));
+				this._handleSubmit(new SubmitEvent('submit', { submitter: evt.target }));
 			}
 		}
 	}
@@ -205,7 +204,7 @@ class Trollbox extends HTMLElement {
 
 
 	async _authenticate() {
-		this.authToken = `eyJ0aW1lc3RhbXAiOjE2MDQ3MDE0NTMsInVzZXJuYW1lIjoiQW5vbnltb3VzIiwic2lnbmF0dXJlIjoiMmEzYTc1NjVmYTE1OTFiOWY5MWJkZjcyYTdkNzdhYjZlZjdjZTU0YWNjMDljZWE5ODUyNDg0Y2IwNTJiNjNmYiJ9`;
+		this.authToken = `eyJ0aW1lc3RhbXAiOjE2MDQ3MDk3MjAsInVzZXJuYW1lIjoiQW5vbnltb3VzIiwic2lnbmF0dXJlIjoiMTk3MDFiMGIzZmM1YzcxZTY4MTdkOTgwODk3ZTYzZjllYzFjMjE3NDkyYzMwM2U2NzhiODBiNjk0YzNjMzA0NyJ9`;
 		return;
 		try {
 			const authToken = await fetch(this.authEndpoint).then(resp => resp.text());
