@@ -121,7 +121,7 @@ class TrollboxInput extends HTMLElement {
 			// Do not submit on empty input
 			if (evt.target.reportValidity() === true) {
 				// Submit form
-				this._handleSubmit(new SubmitEvent('submit', { submitter: evt.target }));
+				this._handleSubmit(new Event('submit', { submitter: evt.target }));
 			}
 		}
 	}
@@ -204,8 +204,6 @@ class Trollbox extends HTMLElement {
 
 
 	async _authenticate() {
-		this.authToken = `eyJ0aW1lc3RhbXAiOjE2MDQ3MDk3MjAsInVzZXJuYW1lIjoiQW5vbnltb3VzIiwic2lnbmF0dXJlIjoiMTk3MDFiMGIzZmM1YzcxZTY4MTdkOTgwODk3ZTYzZjllYzFjMjE3NDkyYzMwM2U2NzhiODBiNjk0YzNjMzA0NyJ9`;
-		return;
 		try {
 			const authToken = await fetch(this.authEndpoint).then(resp => resp.text());
 			if (authToken.length === 0) {
