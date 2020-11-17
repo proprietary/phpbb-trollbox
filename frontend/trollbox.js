@@ -162,6 +162,7 @@ tb-input {
 <div class="container">
   <header>
     <h2>DW Chat</h2>
+    <a href="#" data-id="hide-chat-button"></a>
   </header>
   <main>
     <div data-id="messages">
@@ -192,6 +193,14 @@ class Trollbox extends HTMLElement {
 
 	connectedCallback() {
 		this.shadowRoot.addEventListener('TrollboxSubmitMessage', this._handleSubmitMessage);
+		const toggleHideChatButton = this.shadowRoot.querySelector('[data-id="hide-chat-button"]');
+		toggleHideChatButton.addEventListener('click', this._handleToggleHideChat);
+		if (this._hiddenByUser()) {
+			toggleHideChatButton.textContent = 'Show chat';
+			this._hideChat();
+		} else {
+			toggleHideChatButton.textContent = 'Hide chat';
+		}
 		this._authenticate().then(() => {
 			this._openConnection();
 		});
@@ -200,6 +209,34 @@ class Trollbox extends HTMLElement {
 	disconnectedCallback() {
 		this.shadowRoot.addEventListener('TrollboxSubmitMessage', this._handleSubmitMessage);
 		this._closeConnection();
+	}
+
+	_handleToggleHideChat = (evt) => {
+		if (this._hiddenByUser()) {
+			window.localStorage.setItem('COM_DHAMMAWHEEL_TROLLBOX_VISIBILITY', 'visible');
+			this._showChat();
+			evt.target.textContent = 'Hide chat';
+		} else {
+			window.localStorage.setItem('COM_DHAMMAWHEEL_TROLLBOX_VISIBILITY', 'hidden');
+			this._hideChat();
+			evt.target.textContent = 'Show chat';
+			const helpMessage = document.createElement('aside');
+			helpMessage.textContent = 'You will no longer see the chat in this browser.';
+			evt.target.insertAdjacentElement('afterend', helpMessage);
+		}
+	}
+
+	_hideChat() {
+		this.shadowRoot.querySelector('main').style.display = 'none';
+	}
+
+	_showChat() {
+		this.shadowRoot.querySelector('main').style.display = 'block';
+	}
+
+	_hiddenByUser() {
+		const h = window.localStorage.getItem('COM_DHAMMAWHEEL_TROLLBOX_VISIBILITY');
+		return h !== null && h === 'hidden';
 	}
 
 
