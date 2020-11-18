@@ -158,11 +158,20 @@ trollboxTemplate.innerHTML = `
 tb-input {
   margin-top: 1rem;
 }
+
+[data-id="hide-chat-button"] {
+  display: inline-block;
+  color: darkgray;
+}
+
+[data-id="dw-chat-title"] {
+  display: inline-block;
+}
 </style>
 <div class="container">
   <header>
-    <h2>DW Chat</h2>
-    <a href="#" data-id="hide-chat-button"></a>
+    <h2 data-id="dw-chat-title">DW Chat</h2>
+    <a href="" data-id="hide-chat-button"></a>
   </header>
   <main>
     <div data-id="messages">
@@ -212,17 +221,23 @@ class Trollbox extends HTMLElement {
 	}
 
 	_handleToggleHideChat = (evt) => {
+		evt.preventDefault();
+		const helpMessageElement = () => {
+			const helpMessage = document.createElement('aside');
+			helpMessage.textContent = 'You will no longer see the chat in this browser.';
+			return helpMessage;
+		};
 		if (this._hiddenByUser()) {
 			window.localStorage.setItem('COM_DHAMMAWHEEL_TROLLBOX_VISIBILITY', 'visible');
 			this._showChat();
 			evt.target.textContent = 'Hide chat';
+			// remove the help message created when toggling hide
+			evt.target.parentElement.querySelector('aside').remove();
 		} else {
 			window.localStorage.setItem('COM_DHAMMAWHEEL_TROLLBOX_VISIBILITY', 'hidden');
 			this._hideChat();
 			evt.target.textContent = 'Show chat';
-			const helpMessage = document.createElement('aside');
-			helpMessage.textContent = 'You will no longer see the chat in this browser.';
-			evt.target.insertAdjacentElement('afterend', helpMessage);
+			evt.target.insertAdjacentElement('afterend', helpMessageElement());
 		}
 	}
 
