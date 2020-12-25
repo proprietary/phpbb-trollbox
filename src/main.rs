@@ -150,14 +150,10 @@ impl Handler for Server {
 					.as_nanos()
 					.to_string();
 				self.out.ping(t.into())?;
-				self.ping_timeout.take();
 				self.out.timeout(10_000, PING)
 			},
 			EXPIRE => {
 				debug!("EXPIRED timeout met. Client did not pong back in time.");
-				if let Some(t) = self.expire_timeout.take() {
-					debug!("on_timeout(): expired timeout is {:#?}", t);
-				}
 				self.out.timeout(60_000, EXPIRE)
 				// TODO: drop connection here?
 			},
@@ -202,10 +198,6 @@ impl Handler for Server {
         }
 
         // Some activity has occured, so reset the expiration
-		if let Some(t) = self.expire_timeout.take() {
-			debug!("expire timeout: {:#?}", t);
-			self.out.cancel(t).unwrap();
-		}
         self.out.timeout(60_000, EXPIRE)?;
 
         // Run default frame validation
