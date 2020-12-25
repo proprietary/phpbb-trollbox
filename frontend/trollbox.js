@@ -328,7 +328,7 @@ class Trollbox extends HTMLElement {
 	_addMessage = (msg) => {
 		// detect URLs and make them links
 		const urlPattern = /((([A-Za-z]{3,9}:(?:\/\/)?)(?:[\-;:&=\+\$,\w]+@)?[A-Za-z0-9\.\-]+|(?:www\.|[\-;:&=\+\$,\w]+@)[A-Za-z0-9\.\-]+)((?:\/[\+~%\/\.\w\-_]*)?\??(?:[\-\+=&;%@\.\w_]*)#?(?:[\.\!\/\\\w]*))?)/gi;
-		msg.text = msg.text.replace(new RegExp(urlPattern), '<a href="$1" rel="nofollow">$1</a>');
+		msg.text = msg.text.replace(new RegExp(urlPattern), '<a href="$1" rel="nofollow" target="_blank">$1</a>');
 		// insert into DOM
 		const newMessageElement = document.createElement('tb-message-row');
 		newMessageElement.setAttribute('author', msg.author);
