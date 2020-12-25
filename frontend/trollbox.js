@@ -34,7 +34,7 @@ class TrollboxMessageRow extends HTMLElement {
 	connectedCallback() {
 		const shadow = this.shadowRoot;
 		shadow.querySelector('.author').textContent = this.getAttribute('author');
-		shadow.querySelector('.message').textContent = this.getAttribute('message');
+		shadow.querySelector('.message').innerHTML = this.getAttribute('message');
 		const t = new Date(this.getAttribute('timestamp'));
 		const dt = shadow.querySelector('time');
 		dt.setAttribute('datetime', t.toISOString());
@@ -199,7 +199,6 @@ class Trollbox extends HTMLElement {
 		return this.getAttribute('authEndpoint');
 	}
 
-
 	connectedCallback() {
 		this.shadowRoot.addEventListener('TrollboxSubmitMessage', this._handleSubmitMessage);
 		const toggleHideChatButton = this.shadowRoot.querySelector('[data-id="hide-chat-button"]');
@@ -253,7 +252,6 @@ class Trollbox extends HTMLElement {
 		const h = window.localStorage.getItem('COM_DHAMMAWHEEL_TROLLBOX_VISIBILITY');
 		return h !== null && h === 'hidden';
 	}
-
 
 	async _authenticate() {
 		try {
@@ -328,6 +326,10 @@ class Trollbox extends HTMLElement {
 	}
 
 	_addMessage = (msg) => {
+		// detect URLs and make them links
+		const urlPattern = /((([A-Za-z]{3,9}:(?:\/\/)?)(?:[\-;:&=\+\$,\w]+@)?[A-Za-z0-9\.\-]+|(?:www\.|[\-;:&=\+\$,\w]+@)[A-Za-z0-9\.\-]+)((?:\/[\+~%\/\.\w\-_]*)?\??(?:[\-\+=&;%@\.\w_]*)#?(?:[\.\!\/\\\w]*))?)/gi;
+		msg.text = msg.text.replace(new RegExp(urlPattern), '<a href="$1" rel="nofollow">$1</a>');
+		// insert into DOM
 		const newMessageElement = document.createElement('tb-message-row');
 		newMessageElement.setAttribute('author', msg.author);
 		newMessageElement.setAttribute('message', msg.text);
