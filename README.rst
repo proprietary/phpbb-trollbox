@@ -14,6 +14,8 @@ Installation
 
 1. Compile server (requires a stable Rust_ toolchain)
 
+   Then deploy this WebSockets application behind a reverse proxy or load balancer, which should do the TLS termination.
+   
 .. code-block:: bash
 
    cargo build --release
@@ -21,10 +23,17 @@ Installation
    # scp, rsync, CI/CD, etc.
    scp target/release/trollbox my-remote-server.com:/srv/trollbox/
 
-Run this WebSockets application behind a reverse proxy or load balancer, which should do the TLS termination.
-2. Copy ``frontend/trollbox.js`` and ``make_auth_token.php`` files to your phpBB3 directory root
+2. Set environment variables for the chat server application:
 
-3. Include the chatbox in the phpBB3 template code; e.g. in ``/var/www/html/styles/prosilver/index_body.html``::
+   - ``TROLLBOX_SECRET``: a random token
+
+3. Set a ``$TROLLBOX_SECRET`` variable in ``/config.php`` of your phpBB3 directory root, which must have the same value as ``TROLLBOX_SECRET`` on the server.
+
+   Needless to say, never expose this secret token to anyone or they could impersonate other users in your chat. This facilitates verifying the user's identity without needing to give any database access to the chat server.
+
+4. Copy ``frontend/trollbox.js`` and ``make_auth_token.php`` files to your phpBB3 directory root
+
+5. Include the chatbox in the phpBB3 template code; e.g. in ``/styles/prosilver/index_body.html`` if you wish to only display the chat on the homepage::
 
 	 <!-- IF S_REGISTERED_USER -->
 	 <script src="/trollbox.js"></script>
