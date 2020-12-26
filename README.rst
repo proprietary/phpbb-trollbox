@@ -40,5 +40,6 @@ Installation
 	 <div>
 	     <tb-trollbox serverEndpoint="wss://my-remote-server.com/ws" authEndpoint="/make_auth_token.php"></tb-trollbox>
 	 </div>
+	 <!-- ENDIF -->
 
 .. _Rust: https://www.rust-lang.org/
