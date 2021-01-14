@@ -17,3 +17,4 @@ env_logger = "0.6.1"
 log = "0.4.11"
 lockfree = "0.5.1"
 mio-extras = "2.0.6"
+uuid = { version = "0.8", features = ["v4"] }
