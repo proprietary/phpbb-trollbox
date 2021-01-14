@@ -18,38 +18,6 @@ const PAST_MESSAGES_MAX_SIZE: usize = 100;
 const PING: Token = Token(1);
 const EXPIRE: Token = Token(2);
 
-// static HTML: &'static [u8] = br#"
-// 	<!doctype html>
-// 	<html>
-// 	<head>
-// 	  <meta charset="utf-8">
-// 	</head>
-// 	<body>
-// 	  <pre id="messages"></pre>
-// 	  <form id="chat_box">
-// 	  <input type="text" id="msg"/>
-// 	  <button type="submit">Send</button>
-// 	  </form>
-// 	  <script>
-// 	  document.addEventListener("DOMContentLoaded", () => {
-//         const auth_token = window.btoa(JSON.stringify({timestamp: Math.floor(new Date().getTime()/1000), username: "me", signature: ""}));
-// 	  	const socket = new WebSocket("ws://" + window.location.host + "/ws", [auth_token]);
-// 	  	socket.addEventListener("message", (evt) => {
-// 	  	  const messages = document.getElementById("messages");
-// 	  	  messages.append(evt.data + "\n");
-// 	  	});
-// 	  	document.getElementById("chat_box").addEventListener("submit", (evt) => {
-// 	  	  evt.preventDefault();
-// 	  	  const msgElement = document.getElementById("msg");
-// 	  	  socket.send(JSON.stringify({username: "anonymous", text: msgElement.value, timestamp: 10000}));
-// 	  	  msgElement.value = "";
-// 	  	});
-// 	  });
-// 	</script>
-// 	</body>
-// 	</html>
-// 	"#;
-
 struct Server {
     out: Sender,
     credentials: Option<SignedCredentials>,
