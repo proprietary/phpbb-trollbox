@@ -2,11 +2,13 @@
 phpBB Trollbox
 --------------
 
-This is a WebSockets chat module for integration with phpBB3 forums. It stores all the chat messages in memory, with no logging, so although there are no moderation features, messages are not retained for very long. This was designed for a phpBB3 forum in a clustered environment, so the chat server should be on a domain or port distinct from the php one serving your phpBB3 forum. It does not alter or touch the database in any way. It is not a phpBB extension.
+This is a WebSockets chat module for integration with phpBB3 forums. It stores all the chat messages in memory, with no logging. There is a delete button beside each chat message for mods and admins to delete individual posts in real-time.
 
-This was created because there were no realtime WebSockets chat libraries or extensions that could hook into phpBB3 easily. The alternatives were all based on AJAX long-polling and writing to the database.
+This was designed for a phpBB3 forum in a clustered environment, so the chat server should be on a domain or port distinct from the php one serving your phpBB3 forum. It does not alter or touch the database in any way. It is not a phpBB extension.
 
-At the moment, the code is very janky but works enough for my purposes. If other people find this useful, I may improve it. Drop a comment in Issues to let me know.
+This was created because there were no real-time WebSockets chat libraries or extensions that could hook into phpBB3 easily. The alternatives were all based on AJAX long-polling and writing to the database. AJAX-based chat can be implemented conveniently in phpBB without the need for an external server, but it is very hard on server load and does not scale, not to mention how slow it is for users. I also did not want the chat system to have any access to the database for security purposes. Users are authenticated through a PHP script that does touch the database, but that runs on the same webroot as the phpBB installation, separate from the chat server.
+
+This was an internal project. If people want to use this, I can make the installation process easier or more detailed. Drop a comment in the Issues to let me know.
 
 ============
 Installation
