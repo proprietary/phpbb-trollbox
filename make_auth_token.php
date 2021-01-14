@@ -29,11 +29,11 @@ if ($user->data['user_id'] != ANONYMOUS && !is_banned($user->data['user_id'])) {
 	$signed_credentials = new stdClass();
 	$credentials->timestamp = time();
 	$credentials->username = $user->data['username'];
-	$credentials->uid = $user->data['user_id'];
-	if ($auth->acl_get('m_')) {
-		$credentials->role = 'mod';
-	} elseif ($auth->acl_get('a_')) {
+	$credentials->uid = (int)$user->data['user_id'];
+	if ($auth->acl_get('a_')) {
 		$credentials->role = 'admin';
+	} elseif ($auth->acl_get('m_')) {
+		$credentials->role = 'mod';
 	} else {
 		$credentials->role = 'user';
 	}
