@@ -254,7 +254,7 @@ class Trollbox extends HTMLElement {
 
 	disconnectedCallback() {
 		this.shadowRoot.removeEventListener('Trollbox-Submit-Message', this._handleSubmitMessage);
-		this.shadowRoot.removeEventListener('Trollbox-Submit-Message', this._handleDeleteMessage);
+		this.shadowRoot.removeEventListener('Trollbox-Delete-Message', this._handleDeleteMessage);
 		this._closeConnection();
 	}
 
