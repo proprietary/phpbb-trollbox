@@ -49,7 +49,7 @@ pub mod trollbox {
                 let credentials_text = serde_json::to_string(&self.credentials).unwrap();
                 let mut hasher = Sha256::new();
                 hasher.update(&credentials_text.into_bytes());
-				hasher.update(&trollbox_secret.into_bytes());
+                hasher.update(&trollbox_secret.into_bytes());
                 let result = hasher.finalize();
                 let mut result_string = String::new();
                 // Convert output digest to lowercase hex string

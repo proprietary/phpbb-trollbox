@@ -6,12 +6,10 @@ use mio_extras::timer::Timeout;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use trollbox::trollbox::auth::{Credentials, SignedCredentials};
-use trollbox::trollbox::msg::{
-    ChatAction, ChatActionType, ChatMessage,
-};
+use trollbox::trollbox::msg::{ChatAction, ChatActionType, ChatMessage};
+use uuid::Uuid;
 use ws::util::Token;
 use ws::{Frame, Handler, Handshake, Message, OpCode, Request, Response, Result, Sender};
-use uuid::Uuid;
 
 const PING: Token = Token(1);
 const EXPIRE: Token = Token(2);
@@ -22,7 +20,7 @@ struct Server {
     past_messages: Arc<Mutex<VecDeque<ChatMessage>>>,
     ping_timeout: Option<Timeout>,
     expire_timeout: Option<Timeout>,
-	past_messages_max_size: usize,
+    past_messages_max_size: usize,
 }
 
 impl Handler for Server {
@@ -87,28 +85,39 @@ impl Handler for Server {
                     if creds.credentials.username == input_action.message.author_name
                         && creds.credentials.uid == input_action.message.author_uid
                     {
-						let mut new_msg: ChatMessage = input_action.message.clone();
-						// create unique ID
-						new_msg.id = Uuid::new_v4().to_string();
-						// update user credentials
-						new_msg.author_name = self.credentials.as_ref().unwrap().credentials.username.clone();
-						new_msg.author_uid = self.credentials.as_ref().unwrap().credentials.uid;
-						new_msg.author_role = self.credentials.as_ref().unwrap().credentials.role.clone();
-						let output_action = ChatAction{
-							action: ChatActionType::PostMessage,
-							message: new_msg.clone(),
-						};
+                        let mut new_msg: ChatMessage = input_action.message.clone();
+                        // create unique ID
+                        new_msg.id = Uuid::new_v4().to_string();
+                        // update user credentials
+                        new_msg.author_name = self
+                            .credentials
+                            .as_ref()
+                            .unwrap()
+                            .credentials
+                            .username
+                            .clone();
+                        new_msg.author_uid = self.credentials.as_ref().unwrap().credentials.uid;
+                        new_msg.author_role =
+                            self.credentials.as_ref().unwrap().credentials.role.clone();
+                        let output_action = ChatAction {
+                            action: ChatActionType::PostMessage,
+                            message: new_msg.clone(),
+                        };
                         let v = Arc::clone(&self.past_messages);
                         let mut vv = v.lock().unwrap();
                         vv.push_front(new_msg);
                         if vv.len() > self.past_messages_max_size {
                             vv.truncate(self.past_messages_max_size);
                         }
-						self.out.broadcast(serde_json::to_string(&output_action).unwrap())
+                        self.out
+                            .broadcast(serde_json::to_string(&output_action).unwrap())
                     } else {
-						Err(ws::Error::new(ws::ErrorKind::Internal, r#"{"error": "No permission to post as this author"}"#))
-					}
-                },
+                        Err(ws::Error::new(
+                            ws::ErrorKind::Internal,
+                            r#"{"error": "No permission to post as this author"}"#,
+                        ))
+                    }
+                }
                 ChatActionType::DeleteMessage => {
                     if creds.credentials.role == "mod" || creds.credentials.role == "admin" {
                         let v = Arc::clone(&self.past_messages);
@@ -119,11 +128,14 @@ impl Handler for Server {
                                 break;
                             }
                         }
-						self.out.broadcast(msg)
+                        self.out.broadcast(msg)
                     } else {
-						Err(ws::Error::new(ws::ErrorKind::Internal, r#"{"error": "No permission to delete this post"}"#))
-					}
-                },
+                        Err(ws::Error::new(
+                            ws::ErrorKind::Internal,
+                            r#"{"error": "No permission to delete this post"}"#,
+                        ))
+                    }
+                }
             }
         } else {
             Err(ws::Error::new(ws::ErrorKind::Internal, ""))
@@ -239,9 +251,12 @@ impl Handler for Server {
                 c.signature = c.make_signature();
                 let output = serde_json::to_string(&c).unwrap();
                 let output = base64::encode_config(output.into_bytes(), base64::URL_SAFE_NO_PAD);
-				let mut resp = Response::new(200, "OK", output.into_bytes());
-				let hdrs = resp.headers_mut();
-				hdrs.push(("Access-Control-Allow-Origin".to_string(), String::from("*").into_bytes()));
+                let mut resp = Response::new(200, "OK", output.into_bytes());
+                let hdrs = resp.headers_mut();
+                hdrs.push((
+                    "Access-Control-Allow-Origin".to_string(),
+                    String::from("*").into_bytes(),
+                ));
                 Ok(resp)
             }
             // "/" => Ok(Response::new(200, "OK", HTML.to_vec())),
@@ -256,14 +271,12 @@ impl Handler for DefaultHandler {}
 
 fn main() {
     env_logger::init();
-	let past_messages_max_size = match std::env::var("TROLLBOX_PAST_MESSAGES_MAX_SIZE") {
-		Ok(past_messages_max_size) => {
-			past_messages_max_size.parse().expect("TROLLBOX_PAST_MESSAGES_MAX_SIZE environment variable should be an integer")
-		},
-		Err(_) => {
-			100
-		}
-	};
+    let past_messages_max_size = match std::env::var("TROLLBOX_PAST_MESSAGES_MAX_SIZE") {
+        Ok(past_messages_max_size) => past_messages_max_size
+            .parse()
+            .expect("TROLLBOX_PAST_MESSAGES_MAX_SIZE environment variable should be an integer"),
+        Err(_) => 100,
+    };
     let past_messages: Arc<Mutex<VecDeque<ChatMessage>>> =
         Arc::new(Mutex::new(VecDeque::with_capacity(past_messages_max_size)));
     ws::Builder::new()
@@ -278,7 +291,7 @@ fn main() {
             past_messages: past_messages.clone(),
             ping_timeout: None,
             expire_timeout: None,
-			past_messages_max_size: past_messages_max_size,
+            past_messages_max_size: past_messages_max_size,
         })
         .unwrap()
         .listen("0.0.0.0:50888")
