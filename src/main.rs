@@ -13,8 +13,6 @@ use ws::util::Token;
 use ws::{Frame, Handler, Handshake, Message, OpCode, Request, Response, Result, Sender};
 use uuid::Uuid;
 
-const PAST_MESSAGES_MAX_SIZE: usize = 100;
-
 const PING: Token = Token(1);
 const EXPIRE: Token = Token(2);
 
@@ -24,6 +22,7 @@ struct Server {
     past_messages: Arc<Mutex<VecDeque<ChatMessage>>>,
     ping_timeout: Option<Timeout>,
     expire_timeout: Option<Timeout>,
+	past_messages_max_size: usize,
 }
 
 impl Handler for Server {
@@ -102,8 +101,8 @@ impl Handler for Server {
                         let v = Arc::clone(&self.past_messages);
                         let mut vv = v.lock().unwrap();
                         vv.push_front(new_msg);
-                        if vv.len() > PAST_MESSAGES_MAX_SIZE {
-                            vv.truncate(PAST_MESSAGES_MAX_SIZE);
+                        if vv.len() > self.past_messages_max_size {
+                            vv.truncate(self.past_messages_max_size);
                         }
 						self.out.broadcast(serde_json::to_string(&output_action).unwrap())
                     } else {
@@ -257,8 +256,16 @@ impl Handler for DefaultHandler {}
 
 fn main() {
     env_logger::init();
+	let past_messages_max_size = match std::env::var("TROLLBOX_PAST_MESSAGES_MAX_SIZE") {
+		Ok(past_messages_max_size) => {
+			past_messages_max_size.parse().expect("TROLLBOX_PAST_MESSAGES_MAX_SIZE environment variable should be an integer")
+		},
+		Err(_) => {
+			100
+		}
+	};
     let past_messages: Arc<Mutex<VecDeque<ChatMessage>>> =
-        Arc::new(Mutex::new(VecDeque::with_capacity(PAST_MESSAGES_MAX_SIZE)));
+        Arc::new(Mutex::new(VecDeque::with_capacity(past_messages_max_size)));
     ws::Builder::new()
         .with_settings(ws::Settings {
             panic_on_internal: false,
@@ -271,6 +278,7 @@ fn main() {
             past_messages: past_messages.clone(),
             ping_timeout: None,
             expire_timeout: None,
+			past_messages_max_size: past_messages_max_size,
         })
         .unwrap()
         .listen("0.0.0.0:50888")

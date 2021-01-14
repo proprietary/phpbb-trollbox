@@ -26,6 +26,7 @@ Installation
 2. Set environment variables for the chat server application:
 
    - ``TROLLBOX_SECRET``: a random token
+   - ``TROLLBOX_PAST_MESSAGES_MAX_SIZE``: number of previous chat messages to retain and load to new users logging in
 
 3. Set a ``$TROLLBOX_SECRET`` variable in ``/config.php`` of your phpBB3 directory root, which must have the same value as ``TROLLBOX_SECRET`` on the server.
 
