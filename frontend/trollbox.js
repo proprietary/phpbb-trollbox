@@ -11,6 +11,10 @@ time {
   white-space: pre-wrap;
 }
 
+.author {
+  cursor: pointer;
+}
+
 .delete-button {
   visibility: hidden;
 }
@@ -25,7 +29,6 @@ time {
 </div>
 `
 
-/* TODO: Click author name to quote (i.e., insert "Bob:" into text field) */
 /* TODO: Show user profile pictures */
 /* TODO: click user profile picture to link to profile page */
 
@@ -53,6 +56,7 @@ class TrollboxMessageRow extends HTMLElement {
 			deleteButton.style.visibility = 'visible';
 			deleteButton.addEventListener('click', this._handleDeleteButtonClick);
 		}
+		shadow.querySelector('.author').addEventListener('click', this._handleAuthorNameClick);
 	}
 
 	disconnectedCallback() {
@@ -60,6 +64,7 @@ class TrollboxMessageRow extends HTMLElement {
 			const deleteButton = this.shadowRoot.querySelector('.delete-button');
 			deleteButton.removeEventListener('click', this._handleDeleteButtonClick);
 		}
+		this.shadowRoot.querySelector('.author').removeEventListener('click', this._handleAuthorNameClick);
 	}
 
 	attributeChangedCallback(name, oldValue, newValue) {
@@ -77,8 +82,14 @@ class TrollboxMessageRow extends HTMLElement {
 		}
 	}
 
-	_handleDeleteButtonClick = () => {
+	_handleDeleteButtonClick = (evt) => {
+		evt.stopPropagation();
 		this.dispatchEvent(new CustomEvent('Trollbox-Delete-Message', {bubbles: true, composed: false, detail: {messageId: this.getAttribute('message-id')}}));
+	}
+
+	_handleAuthorNameClick = (evt) => {
+		evt.stopPropagation();
+		this.dispatchEvent(new CustomEvent('Trollbox-Quote-Author', {bubbles: true, composed: false, detail: {author_name: this.getAttribute('author')}}));
 	}
 }
 
@@ -117,11 +128,13 @@ class TrollboxInput extends HTMLElement {
 	connectedCallback() {
 		this.shadowRoot.querySelector('form').addEventListener('submit', this._handleSubmit);
 		this.shadowRoot.querySelector('textarea').addEventListener('keydown', this._handleKeyPress);
+		this.shadowRoot.addEventListener('Trollbox-Quote-Author', this._handleQuoteAuthor);
 	}
 
 	disconnectedCallback() {
 		this.shadowRoot.querySelector('form').removeEventListener('submit', this._handleSubmit);
 		this.shadowRoot.querySelector('textarea').removeEventListener('keydown', this._handleKeyPress);
+		this.shadowRoot.removeEventListener('Trollbox-Quote-Author', this._handleQuoteAuthor);
 	}
 
 	_handleSubmit = (evt) => {
@@ -148,6 +161,11 @@ class TrollboxInput extends HTMLElement {
 				this._handleSubmit(new Event('submit', { submitter: evt.target }));
 			}
 		}
+	}
+
+	_handleQuoteAuthor = (evt) => {
+		evt.stopPropagation();
+		this.shadowRoot.querySelector('textarea').value = evt.detail.author_name + ': ' + this.shadowRoot.querySelector('textarea').value;
 	}
 }
 
@@ -239,6 +257,7 @@ class Trollbox extends HTMLElement {
 	connectedCallback() {
 		this.shadowRoot.addEventListener('Trollbox-Submit-Message', this._handleSubmitMessage);
 		this.shadowRoot.addEventListener('Trollbox-Delete-Message', this._handleDeleteMessage);
+		this.shadowRoot.addEventListener('Trollbox-Quote-Author', this._handleQuoteAuthor);
 		const toggleHideChatButton = this.shadowRoot.querySelector('[data-id="hide-chat-button"]');
 		toggleHideChatButton.addEventListener('click', this._handleToggleHideChat);
 		if (this._hiddenByUser()) {
@@ -255,6 +274,7 @@ class Trollbox extends HTMLElement {
 	disconnectedCallback() {
 		this.shadowRoot.removeEventListener('Trollbox-Submit-Message', this._handleSubmitMessage);
 		this.shadowRoot.removeEventListener('Trollbox-Delete-Message', this._handleDeleteMessage);
+		this.shadowRoot.removeEventListener('Trollbox-Quote-Author', this._handleQuoteAuthor);
 		this._closeConnection();
 	}
 
@@ -378,10 +398,25 @@ class Trollbox extends HTMLElement {
 		}
 	}
 
+	static _filterText(text, filters) {
+		filters.forEach((filter) => { text = filter(text); });
+		return text;
+	}
+
 	_addMessage = (msg) => {
-		// detect URLs and make them links
-		const urlPattern = /((([A-Za-z]{3,9}:(?:\/\/)?)(?:[\-;:&=\+\$,\w]+@)?[A-Za-z0-9\.\-]+|(?:www\.|[\-;:&=\+\$,\w]+@)[A-Za-z0-9\.\-]+)((?:\/[\+~%\/\.\w\-_]*)?\??(?:[\-\+=&;%@\.\w_]*)#?(?:[\.\!\/\\\w]*))?)/gi;
-		msg.text = msg.text.replace(new RegExp(urlPattern), '<a href="$1" rel="nofollow" target="_blank">$1</a>');
+		msg.text = Trollbox._filterText(msg.text, [
+			(text) => {
+				// detect URLs and make them links
+				const urlPattern = /((([A-Za-z]{3,9}:(?:\/\/)?)(?:[\-;:&=\+\$,\w]+@)?[A-Za-z0-9\.\-]+|(?:www\.|[\-;:&=\+\$,\w]+@)[A-Za-z0-9\.\-]+)((?:\/[\+~%\/\.\w\-_]*)?\??(?:[\-\+=&;%@\.\w_]*)#?(?:[\.\!\/\\\w]*))?)/gi;
+				text = text.replace(new RegExp(urlPattern), '<a href="$1" rel="nofollow" target="_blank">$1</a>');
+				return text;
+			},
+			(text) => {
+				// highlight quote replies to current user
+				const regex = new RegExp('^(' + this.credentials.username + '): ');
+				return text.replace(regex, '<mark>$1</mark>: ');
+			}
+		]);
 		// insert into DOM
 		const newMessageElement = document.createElement('tb-message-row');
 		newMessageElement.setAttribute('author', msg['author_name']);
@@ -436,6 +471,10 @@ class Trollbox extends HTMLElement {
 			}
 		};
 		this._sendWsMessage(inputChatAction);
+	}
+
+	_handleQuoteAuthor = (evt) => {
+		this.shadowRoot.querySelector('tb-input').shadowRoot.dispatchEvent(new CustomEvent('Trollbox-Quote-Author', {detail: evt.detail}));
 	}
 }
 
