@@ -12,6 +12,9 @@ $user->session_begin();
 $auth->acl($user->data);
 $user->setup();
 
+// return this as JSON
+header("Content-Type: application/json");
+
 function is_banned($user_id) {
 	global $user;
 	if ($user_id === false) {
@@ -37,10 +40,10 @@ if ($user->data['user_id'] != ANONYMOUS && !is_banned($user->data['user_id'])) {
 	} else {
 		$credentials->role = 'user';
 	}
-	$encoded_credentials = json_encode($credentials);
+	$encoded_credentials = json_encode($credentials, JSON_UNESCAPED_UNICODE);
 	$signed_credentials->signature = hash('sha256', $encoded_credentials . TROLLBOX_SECRET);
 	$signed_credentials->credentials = $credentials;
-	echo base64_encode_urlsafe(json_encode($signed_credentials));
+	echo base64_encode_urlsafe(json_encode($signed_credentials, JSON_UNESCAPED_UNICODE));
 }
 
 ?>
