@@ -5,7 +5,7 @@ extern crate env_logger;
 use mio_extras::timer::Timeout;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
-use trollbox::trollbox::auth::{Credentials, SignedCredentials};
+use trollbox::trollbox::auth::{from_b64, Credentials, SignedCredentials};
 use trollbox::trollbox::msg::{ChatAction, ChatActionType, ChatMessage};
 use uuid::Uuid;
 use ws::util::Token;
@@ -41,16 +41,10 @@ impl Handler for Server {
             }
         };
         debug!("received credentials string: {}", hdr);
-        let creds: SignedCredentials = match base64::decode_config(hdr, base64::URL_SAFE_NO_PAD) {
-            Ok(creds_json) => match serde_json::from_slice(&creds_json) {
-                Ok(creds) => creds,
-                Err(_) => {
-                    debug!("couldn't deserialize credentials from JSON");
-                    return self.out.close(ws::CloseCode::Error);
-                }
-            },
-            Err(_) => {
-                debug!("couldn't deserialize credentials from url-safe base64");
+        let creds = match from_b64(hdr.as_bytes()) {
+            Some(c) => c,
+            None => {
+                debug!("bad credentials from base64'd payload: {}", hdr);
                 return self.out.close(ws::CloseCode::Error);
             }
         };
@@ -82,9 +76,7 @@ impl Handler for Server {
             let input_action: ChatAction = serde_json::from_str(msg.as_text().unwrap()).unwrap();
             match input_action.action {
                 ChatActionType::PostMessage => {
-                    if creds.credentials.username == input_action.message.author_name
-                        && creds.credentials.uid == input_action.message.author_uid
-                    {
+                    if creds.credentials.uid == input_action.message.author_uid {
                         let mut new_msg: ChatMessage = input_action.message.clone();
                         // create unique ID
                         new_msg.id = Uuid::new_v4().to_string();
@@ -112,6 +104,10 @@ impl Handler for Server {
                         self.out
                             .broadcast(serde_json::to_string(&output_action).unwrap())
                     } else {
+                        debug!(
+                            "author_name = {}, username = {}",
+                            input_action.message.author_name, creds.credentials.username
+                        );
                         Err(ws::Error::new(
                             ws::ErrorKind::Internal,
                             r#"{"error": "No permission to post as this author"}"#,
@@ -242,7 +238,7 @@ impl Handler for Server {
                             .duration_since(std::time::SystemTime::UNIX_EPOCH)
                             .unwrap()
                             .as_secs(),
-                        username: String::from("Anonymous"),
+                        username: String::from("An\u{00f6}nymous"),
                         uid: 0,
                         role: String::from("admin"),
                     },
